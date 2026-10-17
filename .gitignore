@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Pastas locais (anotacoes - nao versionar) ###
+mapas/
+
+### Credenciais (nao versionar) ###
+.env

@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-Backend **Spring Boot** de autenticação (login + refresh token) e tarefas (listagem), organizado como **Monólito Modular** seguindo o guia de arquitetura backend.
+Backend **Spring Boot** de autenticação (login + refresh token) e tarefas (listagem), organizado como **Monólito Modular** — estrutura simples, sem frescuras.
 
 ## Stack
 
@@ -12,18 +12,21 @@ Backend **Spring Boot** de autenticação (login + refresh token) e tarefas (lis
 | Spring Boot | 4.1.1 |
 | Build | Maven (wrapper `mvnw` / `mvnw.cmd`) |
 | Lombok | sim (annotation processor no pom) |
-| Banco de dados | PostgreSQL (previsto — **não configurado ainda**) |
+| Banco de dados | **MySQL** (configurado via `.env` — Spring Data JPA + `mysql-connector-j`) |
+| Senhas | BCrypt (`spring-security-crypto`) |
+| Validação | `spring-boot-starter-validation` (Bean Validation nos DTOs) |
 
 ## Arquitetura
 
+**Simples / sem frescuras (decisão do usuário — 2026-10-17):**
+
+- 4 áreas de topo: `core/`, `infrastructure/`, `shared/`, `modules/`
+- Cada módulo: `entities/`, `dtos/`, `interfaces/`, `enums/` + `Controller` + `Service` + `Repositoy`
+- Persistência: Spring Data JPA direto no módulo (`Repositoy extends JpaRepository`)
+- Senha: BCrypt dentro do `Service` (sem camada de port/abstração)
+- Erro de negócio: `ResponseStatusException` no `Service` (sem handler próprio)
+
 **Guia de referência (skill):** `guia-monolito-modular-clean-architecture-e-modulos-desacoplados`
-
-- Monólito Modular + Clean Architecture + Módulos Desacoplados
-- Direção das dependências: `presentation → application → domain`
-- Infraestrutura **implementa** contratos (ports) definidos pelas camadas internas
-- Composição em `bootstrap/` (o caso de uso nunca instancia repositório concreto)
-- Comunicação entre módulos: contratos públicos (síncrono), eventos (assíncrono), identificadores
-
 **Regras de código (skill):** `java-coding-rules`
 
 ## Estrutura do Projeto
@@ -32,25 +35,18 @@ Package raiz: `com.ars.UserLoginRefreshListTask` (mantido — padrão existente)
 
 ```
 src/main/java/com/ars/UserLoginRefreshListTask/
-├── core/             # config, errors, logging, observability (SEM regra de negócio)
-├── shared/           # types, utils, primitives, contracts (reutilizável genuíno)
-├── infrastructure/   # database, cache, http (implementações técnicas)
-├── auth/             # login, logout, tokens, sessões
-│   ├── domain/          {entities, value-objects, errors}
-│   ├── application/     {use-cases, ports, dto}
-│   ├── infrastructure/  {persistence}
-│   └── presentation/    {http}
-├── user/             # conta, perfil, credenciais
-│   ├── domain/          {entities, value-objects, errors}
-│   ├── application/     {use-cases, ports, dto}
-│   ├── infrastructure/  {persistence}
-│   └── presentation/    {http}
-├── task/             # tarefas
-│   ├── domain/          {entities, value-objects, errors}
-│   ├── application/     {use-cases, ports, dto}
-│   ├── infrastructure/  {persistence}
-│   └── presentation/    {http}
-├── bootstrap/        # composição: conecta contratos ↔ implementações
+├── core/                  # config, errors, logging, observability (futuro)
+├── infrastructure/        # database, cache, http (futuro)
+├── shared/                # types, utils, primitives, contracts (futuro)
+├── modules/
+│   └── user/              # cadastro de usuário (IMPLEMENTADO)
+│       ├── entities/         User.java (@Entity tabela users)
+│       ├── dtos/             CreateUserRequest, CreateUserResponse
+│       ├── interfaces/       (futuro)
+│       ├── enums/            (futuro)
+│       ├── UserController.java   POST /users
+│       ├── UserService.java      cadastro + BCrypt + 409
+│       └── UserRepository.java   extends JpaRepository
 └── UserLoginRefreshListTaskApplication.java   # entry point
 ```
 
@@ -58,20 +54,30 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 
 ## Módulos
 
-| Módulo | Responsabilidade (guia §6) |
-|--------|---------------------------|
-| **auth** | Login, logout, access/refresh token, rotação, sessões |
-| **user** | Cadastro, perfil, estado da conta, hash de senha |
-| **task** | Tarefas (listagem/criação) — referencia `userId`, não a entidade User |
+| Módulo | Status | Responsabilidade |
+|--------|--------|------------------|
+| **user** | ✅ implementado | Cadastro básico: nome, email, senha (BCrypt), descrição |
+| **auth** | ⏳ futuro (`modules/auth`) | Login, logout, access/refresh token, rotação |
+| **task** | ⏳ futuro (`modules/task`) | Tarefas (listagem/criação) — referencia `userId` |
+
+## API
+
+| Método | Rota | Body | Resposta |
+|--------|------|------|----------|
+| POST | `/users` | `{name, email, password, description?}` | `201 {id, name, email, description}` |
+
+- Validação: nome 2–100, email válido, senha 6–72, descrição máx 500 (opcional)
+- Email duplicado → `409 {error}`
+- Senha **nunca** retorna na resposta
 
 ## Regras Importantes
 
-- Módulo **não importa detalhes internos** de outro módulo — só contratos públicos
-- Domínio **não depende** de Spring/JPA/HTTP — regras puras em `domain/`
-- Repositório: interface (contrato) no módulo + implementação JPA em `infrastructure/`
+- Estrutura interna do módulo **sem frescuras**: entities/dtos/interfaces/enums + Controller/Service/Repositoy
 - Constructor injection com `@RequiredArgsConstructor` (nunca `@Autowired` field)
-- DTOs = `record` (Java 21); Entidades = class com Lombok
-- Ver guia completa: skill `guia-monolito-modular-clean-architecture-e-modulos-desacoplados`
+- DTOs = `record` (Java 21); Entidade = class com Lombok `@Getter/@Setter`
+- Tabela `users` (plural — `user` é palavra reservada do MySQL)
+- Credenciais **somente** no `.env` (gitignorado; `.env.example` é o template)
+- `.env` lido via `spring.config.import=optional:file:.env` + `${DB_URL}` etc.
 
 ## Comandos Úteis
 
@@ -81,11 +87,15 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 .\mvnw.cmd compile             # compilar
 .\mvnw.cmd test                # testes
 .\mvnw.cmd clean install       # build completo
+
+# Banco (uma vez)
+mysql -u root -p -e "CREATE DATABASE user_login_refresh_list_task;"
 ```
 
 ## Decisões Pendentes
 
-- [ ] Configurar PostgreSQL (dependency + `application.properties` + driver)
-- [ ] Definir portas/contratos do módulo `auth` (login/refresh)
-- [ ] Naming do package raiz: `UserLoginRefreshListTask` tem maiúsculas (viola lowercase) — decidir se mantém ou renomeia
-- [ ] Primeiro caso de uso: `CreateTask`/`ListTasks` ou fluxo de login
+- [ ] Criar database MySQL `user_login_refresh_list_task` (se ainda não existe)
+- [ ] Testar `POST /users` via curl/Thunder Client
+- [ ] Módulo `auth` (login/refresh) em `modules/auth`
+- [ ] Módulo `task` em `modules/task`
+- [ ] Naming do package raiz: `UserLoginRefreshListTask` tem maiúsculas (viola lowercase) — manter ou renomear
