@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 /**
  * Dados de entrada do cadastro de usuario.
  */
-public record CreateUserRequest(
+public record CreateUserDto(
         @NotBlank(message = "Nome e obrigatorio")
         @Size(min = 2, max = 100, message = "Nome deve ter entre 2 e 100 caracteres")
         String name,

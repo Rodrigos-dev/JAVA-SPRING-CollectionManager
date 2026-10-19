@@ -8,9 +8,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 /**
  * Entidade do usuario (tabela users - "user" e palavra reservada do MySQL).
+ * deletedAt = soft delete (null = ativo, data = excluido).
  */
 @Entity
 @Table(name = "users")
@@ -33,4 +38,13 @@ public class User {
 
     @Column(length = 500)
     private String description;
+
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
+
+    private LocalDateTime deletedAt;
 }
