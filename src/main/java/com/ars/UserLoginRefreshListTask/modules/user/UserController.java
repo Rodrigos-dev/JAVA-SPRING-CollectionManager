@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -56,11 +57,13 @@ public class UserController {
 
     // ========== READ ==========
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<List<UserResponse>> getAll() {
         return ResponseEntity.ok(userService.getAll());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/paged")
     public ResponseEntity<Page<UserResponse>> getAllPaged(
             @RequestParam(defaultValue = "0") int page,
@@ -74,11 +77,13 @@ public class UserController {
         return ResponseEntity.ok(userService.getAllPaged(pageable));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/like")
     public ResponseEntity<List<UserResponse>> getAllLike(@RequestParam String search) {
         return ResponseEntity.ok(userService.getAllLike(search));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/like/paged")
     public ResponseEntity<Page<UserResponse>> getAllLikePaged(
             @RequestParam String search,
@@ -93,6 +98,7 @@ public class UserController {
         return ResponseEntity.ok(userService.getAllLikePaged(search, pageable));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/query")
     public ResponseEntity<List<UserResponse>> getAllQuery(
             @RequestParam(required = false) String name,
@@ -100,6 +106,7 @@ public class UserController {
         return ResponseEntity.ok(userService.getAllQuery(name, email));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/query/paged")
     public ResponseEntity<Page<UserResponse>> getAllQueryPaged(
             @RequestParam(required = false) String name,
@@ -115,6 +122,7 @@ public class UserController {
         return ResponseEntity.ok(userService.getAllQueryPaged(name, email, pageable));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getById(id));
@@ -122,12 +130,14 @@ public class UserController {
 
     // ========== UPDATE ==========
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> update(@PathVariable Long id,
                                                @Valid @RequestBody UpdateUserDto dto) {
         return ResponseEntity.ok(userService.update(id, dto));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PatchMapping("/{id}")
     public ResponseEntity<UserResponse> partialUpdate(@PathVariable Long id,
                                                       @Valid @RequestBody PatchUserDto dto) {
@@ -136,6 +146,7 @@ public class UserController {
 
     // ========== DELETE ==========
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         userService.delete(id);

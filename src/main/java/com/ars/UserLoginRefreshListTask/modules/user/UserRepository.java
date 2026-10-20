@@ -35,4 +35,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findAllActiveLike(@Param("search") String search, Pageable pageable);
 
     Optional<User> findByIdAndDeletedAtIsNull(Long id);
+
+    @Query("SELECT u FROM User u WHERE u.email = :email AND u.deletedAt IS NULL")
+    Optional<User> findByEmailAndDeletedAtIsNull(@Param("email") String email);
 }
