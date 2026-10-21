@@ -15,6 +15,8 @@ Backend **Spring Boot** de autenticação (login + refresh token) e tarefas (lis
 | Banco de dados | **MySQL** (configurado via `.env` — Spring Data JPA + `mysql-connector-j`) |
 | Senhas | BCrypt (`spring-security-crypto`) |
 | Validação | `spring-boot-starter-validation` (Bean Validation nos DTOs) |
+| JWT | `jjwt` 0.12.6 (access + refresh token) |
+| Documentação | **Swagger UI** via `springdoc-openapi-starter-webmvc-ui` **3.1.1** (v3 = Spring Boot 4) |
 
 ## Arquitetura
 
@@ -56,8 +58,8 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 
 | Módulo | Status | Responsabilidade |
 |--------|--------|------------------|
-| **user** | ✅ implementado | Cadastro básico: nome, email, senha (BCrypt), descrição |
-| **auth** | ⏳ futuro (`modules/auth`) | Login, logout, access/refresh token, rotação |
+| **user** | ✅ implementado | CRUD completo com soft delete, paginação, busca LIKE/query |
+| **auth** | ✅ implementado | Login, refresh, JWT (access 1h / refresh 30h), `@PreAuthorize` por endpoint |
 | **task** | ⏳ futuro (`modules/task`) | Tarefas (listagem/criação) — referencia `userId` |
 
 ## API
@@ -69,6 +71,24 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 - Validação: nome 2–100, email válido, senha 6–72, descrição máx 500 (opcional)
 - Email duplicado → `409 {error}`
 - Senha **nunca** retorna na resposta
+
+### Endpoints (13 operações)
+
+- **Auth (público):** `POST /auth/login`, `POST /auth/refresh`
+- **Users:** `POST /users` (público) · `GET /users`, `GET /users/paged`, `GET /users/like`, `GET /users/like/paged`, `GET /users/query`, `GET /users/query/paged`, `GET /users/{id}`, `PUT /users/{id}`, `PATCH /users/{id}`, `DELETE /users/{id}` (todos com `Authorization: Bearer <accessToken>`)
+
+## Swagger / Documentação (springdoc 3.1.1)
+
+| URL | O que é |
+|-----|---------|
+| `http://localhost:8080/swagger-ui.html` | UI visual (redireciona p/ `/swagger-ui/index.html`) |
+| `http://localhost:8080/v3/api-docs` | JSON bruto da doc |
+| `http://localhost:8080/v3/api-docs.yaml` | YAML da doc |
+
+- **Arquivos:** `core/OpenApiConfig.java` (info + scheme `bearerAuth`), `SecurityConfig` (`permitAll` em swagger + `POST /users`), `application.properties` (props `springdoc.*`), anotações `@Tag`/`@Operation`/`@ApiResponses` nos controllers
+- **Gotcha Authorize:** operação protegida precisa de `security = @SecurityRequirement(name = "bearerAuth")` no `@Operation`, senão o token **não é enviado** → 403
+- Endpoint sem token/token inválido retorna **403** (Spring Security sem entry point custom)
+- Mapa de estudo completo: `mapas/7 - SWAGER DOCMENTACAO/` (gitignorado)
 
 ## Regras Importantes
 
@@ -82,7 +102,8 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 ## Comandos Úteis
 
 ```powershell
-# Windows (PowerShell) — SEMPRE usar mvnw.cmd
+# Windows (PowerShell) — SEMPRE usar mvnw.cmd e JAVA_HOME do jdk-22 (Lombok quebra no jdk-27)
+$env:JAVA_HOME="C:\Program Files\Java\jdk-22"
 .\mvnw.cmd spring-boot:run     # rodar app
 .\mvnw.cmd compile             # compilar
 .\mvnw.cmd test                # testes
@@ -94,8 +115,9 @@ mysql -u root -p -e "CREATE DATABASE user_login_refresh_list_task;"
 
 ## Decisões Pendentes
 
-- [ ] Criar database MySQL `user_login_refresh_list_task` (se ainda não existe)
-- [ ] Testar `POST /users` via curl/Thunder Client
-- [ ] Módulo `auth` (login/refresh) em `modules/auth`
+- [x] Criar database MySQL `user_login_refresh_list_task`
+- [x] Testar `POST /users` via curl/Thunder Client
+- [x] Módulo `auth` (login/refresh) em `modules/auth`
+- [x] Swagger UI + documentação dos endpoints (2026-10-21)
 - [ ] Módulo `task` em `modules/task`
 - [ ] Naming do package raiz: `UserLoginRefreshListTask` tem maiúsculas (viola lowercase) — manter ou renomear

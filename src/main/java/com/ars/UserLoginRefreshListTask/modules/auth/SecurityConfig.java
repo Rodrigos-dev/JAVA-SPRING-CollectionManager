@@ -3,6 +3,7 @@ package com.ars.UserLoginRefreshListTask.modules.auth;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -13,6 +14,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 /**
  * Configuracao de seguranca.
  * - /auth/** (login, refresh) e PUBLICO
+ * - POST /users (cadastro) e PUBLICO - demais /users exigem token
+ * - /swagger-ui/**, /swagger-ui.html e /v3/api-docs/** PUBLICOS (doc da API)
  * - @EnableMethodSecurity liga o @PreAuthorize nos controllers (guard por endpoint)
  * - SecurityConfig fica como rede de seguranca: qualquer rota sem @PreAuthorize
  *   ainda exige token
@@ -33,6 +36,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
+                        // Cadastro publico (sem conta nao existe login - evita calo-ovo)
+                        .requestMatchers(HttpMethod.POST, "/users").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

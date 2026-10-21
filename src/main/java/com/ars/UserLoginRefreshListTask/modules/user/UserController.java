@@ -1,9 +1,18 @@
 package com.ars.UserLoginRefreshListTask.modules.user;
 
+import com.ars.UserLoginRefreshListTask.core.GlobalExceptionHandler;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.CreateUserDto;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.PatchUserDto;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.UpdateUserDto;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.UserResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -39,7 +48,10 @@ import java.util.List;
  * PUT    /users/{id}               -> 200 UserResponse (update completo)
  * PATCH  /users/{id}               -> 200 UserResponse (update parcial)
  * DELETE /users/{id}               -> 204 (soft delete)
+ *
+ * Todos exigem "Authorization: Bearer <accessToken>" (exceto POST /users).
  */
+@Tag(name = "Users", description = "CRUD de usuarios com soft delete, paginacao e buscas")
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
@@ -49,6 +61,14 @@ public class UserController {
 
     // ========== CREATE ==========
 
+    @Operation(summary = "Criar usuario", description = "Cadastra um usuario novo (senha criptografada com BCrypt). Retorna 201")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Usuario criado"),
+            @ApiResponse(responseCode = "400", description = "Validacao falhou (nome/email/senha)",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "409", description = "Email ja cadastrado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserDto dto) {
         UserResponse response = userService.create(dto);
@@ -58,12 +78,24 @@ public class UserController {
     // ========== READ ==========
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar todos", description = "Lista completa de usuarios (sem paginacao)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de usuarios"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @GetMapping
     public ResponseEntity<List<UserResponse>> getAll() {
         return ResponseEntity.ok(userService.getAll());
     }
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar paginado", description = "Lista paginada com ordenacao configuravel", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Pagina de usuarios"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @GetMapping("/paged")
     public ResponseEntity<Page<UserResponse>> getAllPaged(
             @RequestParam(defaultValue = "0") int page,
@@ -78,12 +110,28 @@ public class UserController {
     }
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Busca LIKE", description = "Busca por trecho em nome/email (sem paginacao)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista filtrada"),
+            @ApiResponse(responseCode = "400", description = "Parametro 'search' ausente",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @GetMapping("/like")
     public ResponseEntity<List<UserResponse>> getAllLike(@RequestParam String search) {
         return ResponseEntity.ok(userService.getAllLike(search));
     }
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Busca LIKE paginada", description = "Busca por trecho em nome/email com paginacao", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Pagina filtrada"),
+            @ApiResponse(responseCode = "400", description = "Parametro 'search' ausente",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @GetMapping("/like/paged")
     public ResponseEntity<Page<UserResponse>> getAllLikePaged(
             @RequestParam String search,
@@ -99,6 +147,12 @@ public class UserController {
     }
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Busca exata", description = "Filtra por name e/ou email exatos (sem paginacao)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista filtrada"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @GetMapping("/query")
     public ResponseEntity<List<UserResponse>> getAllQuery(
             @RequestParam(required = false) String name,
@@ -107,6 +161,12 @@ public class UserController {
     }
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Busca exata paginada", description = "Filtra por name e/ou email exatos com paginacao", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Pagina filtrada"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @GetMapping("/query/paged")
     public ResponseEntity<Page<UserResponse>> getAllQueryPaged(
             @RequestParam(required = false) String name,
@@ -123,6 +183,14 @@ public class UserController {
     }
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Buscar por id", description = "Retorna um usuario pelo id", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuario encontrado"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Usuario nao encontrado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getById(id));
@@ -131,6 +199,18 @@ public class UserController {
     // ========== UPDATE ==========
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Atualizar usuario", description = "Update completo (PUT) - todos os campos obrigatorios", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuario atualizado"),
+            @ApiResponse(responseCode = "400", description = "Validacao falhou",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Usuario nao encontrado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "409", description = "Email ja cadastrado por outro usuario",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> update(@PathVariable Long id,
                                                @Valid @RequestBody UpdateUserDto dto) {
@@ -138,6 +218,18 @@ public class UserController {
     }
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Atualizacao parcial", description = "Update parcial (PATCH) - envie apenas os campos a alterar", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuario atualizado"),
+            @ApiResponse(responseCode = "400", description = "Validacao falhou",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Usuario nao encontrado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "409", description = "Email ja cadastrado por outro usuario",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @PatchMapping("/{id}")
     public ResponseEntity<UserResponse> partialUpdate(@PathVariable Long id,
                                                       @Valid @RequestBody PatchUserDto dto) {
@@ -147,6 +239,14 @@ public class UserController {
     // ========== DELETE ==========
 
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Excluir usuario", description = "Soft delete - o registro e marcado como removido, nao apagado. Retorna 204", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Usuario removido (soft delete)"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Usuario nao encontrado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         userService.delete(id);
