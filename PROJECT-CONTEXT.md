@@ -41,14 +41,22 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 ├── infrastructure/        # database, cache, http (futuro)
 ├── shared/                # types, utils, primitives, contracts (futuro)
 ├── modules/
-│   └── user/              # cadastro de usuário (IMPLEMENTADO)
-│       ├── entities/         User.java (@Entity tabela users)
-│       ├── dtos/             CreateUserRequest, CreateUserResponse
+│   ├── user/                # cadastro de usuário (IMPLEMENTADO)
+│   │   ├── entities/         User.java (@Entity tabela users, 1 -> N collections)
+│   │   ├── dtos/             CreateUserDto, UpdateUserDto, PatchUserDto, UserResponse
+│   │   ├── interfaces/       (futuro)
+│   │   ├── enums/            UserRoleEnum
+│   │   ├── UserController.java   CRUD /users (10 rotas)
+│   │   ├── UserService.java      CRUD + BCrypt + soft delete + 409
+│   │   └── UserRepository.java   extends JpaRepository
+│   └── collection/          # coleções do usuário (IMPLEMENTADO)
+│       ├── entities/         Collection.java (@Entity tabela collections, N -> 1 user)
+│       ├── dtos/             CreateCollectionDto, UpdateCollectionDto, PatchCollectionDto, CollectionResponse
 │       ├── interfaces/       (futuro)
 │       ├── enums/            (futuro)
-│       ├── UserController.java   POST /users
-│       ├── UserService.java      cadastro + BCrypt + 409
-│       └── UserRepository.java   extends JpaRepository
+│       ├── CollectionController.java   CRUD /collections (9 rotas)
+│       ├── CollectionService.java      CRUD + owner do JWT + soft delete + 409
+│       └── CollectionRepository.java   extends JpaRepository (scoped por owner)
 └── UserLoginRefreshListTaskApplication.java   # entry point
 ```
 
@@ -60,7 +68,15 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 |--------|--------|------------------|
 | **user** | ✅ implementado | CRUD completo com soft delete, paginação, busca LIKE/query |
 | **auth** | ✅ implementado | Login, refresh, JWT (access 1h / refresh 30h), `@PreAuthorize` por endpoint |
+| **collection** | ✅ implementado | Coleções do usuário autenticado — `user (1) → collections (N)`, dono vem do JWT |
 | **task** | ⏳ futuro (`modules/task`) | Tarefas (listagem/criação) — referencia `userId` |
+
+### Relacionamento user → collection
+
+- Tabela `collections` com FK `user_id` → `users(id)` (`@ManyToOne owner` no lado N, `@OneToMany(mappedBy = "owner")` no lado 1)
+- Tabela criada **automaticamente** pelo Hibernate (`spring.jpa.hibernate.ddl-auto=update`) — sem migration
+- `code` é **unique global** → `409` em duplicidade (mesma regra do `email` em users)
+- Todo acesso é **escopado ao usuário do token**: listar/busca só retorna as próprias coleções; id de outro usuário → `404` (sem vazamento)
 
 ## API
 
@@ -72,10 +88,11 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 - Email duplicado → `409 {error}`
 - Senha **nunca** retorna na resposta
 
-### Endpoints (13 operações)
+### Endpoints (22 operações)
 
 - **Auth (público):** `POST /auth/login`, `POST /auth/refresh`
 - **Users:** `POST /users` (público) · `GET /users`, `GET /users/paged`, `GET /users/like`, `GET /users/like/paged`, `GET /users/query`, `GET /users/query/paged`, `GET /users/{id}`, `PUT /users/{id}`, `PATCH /users/{id}`, `DELETE /users/{id}` (todos com `Authorization: Bearer <accessToken>`)
+- **Collections (todos com token):** `POST /collections`, `GET /collections`, `GET /collections/paged`, `GET /collections/like`, `GET /collections/like/paged`, `GET /collections/{id}`, `PUT /collections/{id}`, `PATCH /collections/{id}`, `DELETE /collections/{id}`
 
 ## Swagger / Documentação (springdoc 3.1.1)
 
@@ -119,5 +136,6 @@ mysql -u root -p -e "CREATE DATABASE user_login_refresh_list_task;"
 - [x] Testar `POST /users` via curl/Thunder Client
 - [x] Módulo `auth` (login/refresh) em `modules/auth`
 - [x] Swagger UI + documentação dos endpoints (2026-10-21)
+- [x] Módulo `collection` (tabela `collections`, user 1 → N) — 2026-10-24
 - [ ] Módulo `task` em `modules/task`
 - [ ] Naming do package raiz: `UserLoginRefreshListTask` tem maiúsculas (viola lowercase) — manter ou renomear
