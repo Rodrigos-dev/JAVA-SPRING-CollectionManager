@@ -1,5 +1,6 @@
 package com.ars.UserLoginRefreshListTask.modules.collection.entities;
 
+import com.ars.UserLoginRefreshListTask.modules.collectionitem.entities.CollectionItem;
 import com.ars.UserLoginRefreshListTask.modules.user.entities.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,6 +18,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Entidade colecao do usuario (tabela collections).
@@ -48,6 +51,13 @@ public class Collection {
     @ManyToOne(optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User owner;
+
+    /**
+     * Itens da colecao (1 -> N). LAZY (padrao do OneToMany) - nunca entra
+     * nas respostas, que expem apenas dados da propria colecao.
+     */
+    @OneToMany(mappedBy = "collection")
+    private List<CollectionItem> items;
 
     @CreationTimestamp
     @Column(updatable = false)

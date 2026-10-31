@@ -49,14 +49,20 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 │   │   ├── UserController.java   CRUD /users (10 rotas)
 │   │   ├── UserService.java      CRUD + BCrypt + soft delete + 409
 │   │   └── UserRepository.java   extends JpaRepository
-│   └── collection/          # coleções do usuário (IMPLEMENTADO)
-│       ├── entities/         Collection.java (@Entity tabela collections, N -> 1 user)
-│       ├── dtos/             CreateCollectionDto, UpdateCollectionDto, PatchCollectionDto, CollectionResponse
-│       ├── interfaces/       (futuro)
-│       ├── enums/            (futuro)
-│       ├── CollectionController.java   CRUD /collections (9 rotas)
-│       ├── CollectionService.java      CRUD + owner do JWT + soft delete + 409
-│       └── CollectionRepository.java   extends JpaRepository (scoped por owner)
+│   ├── collection/          # coleções do usuário (IMPLEMENTADO)
+│   │   ├── entities/         Collection.java (@Entity tabela collections, N -> 1 user, 1 -> N items)
+│   │   ├── dtos/             CreateCollectionDto, UpdateCollectionDto, PatchCollectionDto, CollectionResponse
+│   │   ├── interfaces/       (futuro)
+│   │   ├── enums/            (futuro)
+│   │   ├── CollectionController.java   CRUD /collections (9 rotas)
+│   │   ├── CollectionService.java      CRUD + owner do JWT + soft delete + 409
+│   │   └── CollectionRepository.java   extends JpaRepository (scoped por owner)
+│   └── collectionitem/       # itens das coleções (IMPLEMENTADO)
+│       ├── entities/         CollectionItem.java (@Entity tabela collection_items, N -> 1 collection)
+│       ├── dtos/             CreateCollectionItemDto, UpdateCollectionItemDto, PatchCollectionItemDto, CollectionItemResponse
+│       ├── CollectionItemController.java   CRUD /collection-items (9 rotas)
+│       ├── CollectionItemService.java      CRUD + dono herdado da collection + soft delete + 409
+│       └── CollectionItemRepository.java   extends JpaRepository (scoped por owner da collection)
 └── UserLoginRefreshListTaskApplication.java   # entry point
 ```
 
@@ -69,6 +75,7 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 | **user** | ✅ implementado | CRUD completo com soft delete, paginação, busca LIKE/query |
 | **auth** | ✅ implementado | Login, refresh, JWT (access 1h / refresh 30h), `@PreAuthorize` por endpoint |
 | **collection** | ✅ implementado | Coleções do usuário autenticado — `user (1) → collections (N)`, dono vem do JWT |
+| **collectionitem** | ✅ implementado | Itens das coleções — `collections (1) → collection_items (N)`, dono herdado da collection |
 | **task** | ⏳ futuro (`modules/task`) | Tarefas (listagem/criação) — referencia `userId` |
 
 ### Relacionamento user → collection
@@ -77,6 +84,14 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 - Tabela criada **automaticamente** pelo Hibernate (`spring.jpa.hibernate.ddl-auto=update`) — sem migration
 - `code` é **unique global** → `409` em duplicidade (mesma regra do `email` em users)
 - Todo acesso é **escopado ao usuário do token**: listar/busca só retorna as próprias coleções; id de outro usuário → `404` (sem vazamento)
+
+### Relacionamento collection → collection_item
+
+- Tabela `collection_items` com FK `collection_id` → `collections(id)` (`@ManyToOne collection` no lado N, `@OneToMany(mappedBy = "collection")` no lado 1)
+- **Sem `user_id` próprio** — o dono do item é o `owner` da collection (evita duplicidade de dado)
+- `code` é único **por collection** (não global) → `409` em duplicidade na mesma coleção
+- Todo acesso é escopado ao usuário do token: collection informada/listada que não é dele → `404`
+- Tabela criada automaticamente pelo Hibernate (`ddl-auto=update`) — sem migration
 
 ## API
 
@@ -88,11 +103,12 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 - Email duplicado → `409 {error}`
 - Senha **nunca** retorna na resposta
 
-### Endpoints (22 operações)
+### Endpoints (31 operações)
 
 - **Auth (público):** `POST /auth/login`, `POST /auth/refresh`
 - **Users:** `POST /users` (público) · `GET /users`, `GET /users/paged`, `GET /users/like`, `GET /users/like/paged`, `GET /users/query`, `GET /users/query/paged`, `GET /users/{id}`, `PUT /users/{id}`, `PATCH /users/{id}`, `DELETE /users/{id}` (todos com `Authorization: Bearer <accessToken>`)
 - **Collections (todos com token):** `POST /collections`, `GET /collections`, `GET /collections/paged`, `GET /collections/like`, `GET /collections/like/paged`, `GET /collections/{id}`, `PUT /collections/{id}`, `PATCH /collections/{id}`, `DELETE /collections/{id}`
+- **Collection Items (todos com token):** `POST /collection-items`, `GET /collection-items` (`?collectionId=` opcional), `GET /collection-items/paged`, `GET /collection-items/like`, `GET /collection-items/like/paged`, `GET /collection-items/{id}`, `PUT /collection-items/{id}`, `PATCH /collection-items/{id}`, `DELETE /collection-items/{id}`
 
 ## Swagger / Documentação (springdoc 3.1.1)
 
