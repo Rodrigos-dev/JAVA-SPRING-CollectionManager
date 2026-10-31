@@ -1,21 +1,27 @@
 package com.ars.UserLoginRefreshListTask.modules.collection;
 
+import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CollectionLeftJoinRowResponse;
 import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CollectionResponse;
+import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CollectionWithItemsResponse;
 import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CreateCollectionDto;
 import com.ars.UserLoginRefreshListTask.modules.collection.dtos.PatchCollectionDto;
 import com.ars.UserLoginRefreshListTask.modules.collection.dtos.UpdateCollectionDto;
 import com.ars.UserLoginRefreshListTask.modules.collection.entities.Collection;
+import com.ars.UserLoginRefreshListTask.modules.collectionitem.dtos.CollectionItemResponse;
+import com.ars.UserLoginRefreshListTask.modules.collectionitem.entities.CollectionItem;
 import com.ars.UserLoginRefreshListTask.modules.user.UserRepository;
 import com.ars.UserLoginRefreshListTask.modules.user.entities.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.persistence.criteria.JoinType;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -77,6 +83,92 @@ public class CollectionService {
 
     public CollectionResponse getById(Long id) {
         return toResponse(findOwnedOrThrow(id));
+    }
+
+    // ========== RELACIONAIS (collection -> items) ==========
+
+    public List<CollectionWithItemsResponse> getAllWithRelations() {
+        return collectionRepository.findAllActiveWithRelationsByOwnerId(currentUser().getId()).stream()
+                .map(this::toWithItems)
+                .toList();
+    }
+
+    public CollectionWithItemsResponse getByIdWithRelations(Long id) {
+        Collection collection = collectionRepository.findByIdActiveWithRelations(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Colecao nao encontrada com id: " + id));
+
+        if (!collection.getOwner().getId().equals(currentUser().getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Colecao nao encontrada com id: " + id);
+        }
+
+        return toWithItems(collection);
+    }
+
+    public List<CollectionLeftJoinRowResponse> getAllLeftJoin() {
+        return collectionRepository.findAllActiveLeftJoinRowsByOwnerId(currentUser().getId()).stream()
+                .map(this::toLeftJoinRow)
+                .toList();
+    }
+
+    public List<CollectionLeftJoinRowResponse> getByIdLeftJoin(Long id) {
+        List<Object[]> rows = collectionRepository.findActiveLeftJoinRowsById(id);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Colecao nao encontrada com id: " + id);
+        }
+
+        Collection collection = (Collection) rows.get(0)[0];
+        if (!collection.getOwner().getId().equals(currentUser().getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Colecao nao encontrada com id: " + id);
+        }
+
+        return rows.stream()
+                .map(this::toLeftJoinRow)
+                .toList();
+    }
+
+    // ========== SPECIFICATIONS (mesmo resultado do with-relations, join programatico) ==========
+
+    public List<CollectionWithItemsResponse> getAllWithSpecifications() {
+        return collectionRepository.findAll(myCollectionsWithItemsSpec()).stream()
+                .map(this::toWithItems)
+                .toList();
+    }
+
+    public CollectionWithItemsResponse getByIdWithSpecifications(Long id) {
+        Collection collection = collectionRepository.findAll(collectionByIdWithItemsSpec(id)).stream()
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Colecao nao encontrada com id: " + id));
+        return toWithItems(collection);
+    }
+
+    /**
+     * Specification "fluente" equivalente ao LEFT JOIN FETCH do JPQL:
+     * root.fetch("items", LEFT) e o join programatico + o escopo do dono no where.
+     */
+    private Specification<Collection> myCollectionsWithItemsSpec() {
+        return (root, query, cb) -> {
+            query.distinct(true);
+            root.fetch("items", JoinType.LEFT);
+            return cb.and(
+                    cb.isNull(root.get("deletedAt")),
+                    cb.equal(root.get("owner").get("id"), currentUser().getId()));
+        };
+    }
+
+    private Specification<Collection> collectionByIdWithItemsSpec(Long id) {
+        return (root, query, cb) -> {
+            query.distinct(true);
+            root.fetch("items", JoinType.LEFT);
+            return cb.and(
+                    cb.isNull(root.get("deletedAt")),
+                    cb.equal(root.get("id"), id),
+                    cb.equal(root.get("owner").get("id"), currentUser().getId()));
+        };
     }
 
     // ========== UPDATE ==========
@@ -177,5 +269,51 @@ public class CollectionService {
                 collection.getCreatedAt(),
                 collection.getUpdatedAt()
         );
+    }
+
+    private CollectionWithItemsResponse toWithItems(Collection collection) {
+        return new CollectionWithItemsResponse(
+                collection.getId(),
+                collection.getName(),
+                collection.getCode(),
+                collection.getDescription(),
+                collection.getOwner().getId(),
+                collection.getOwner().getName(),
+                collection.getCreatedAt(),
+                collection.getUpdatedAt(),
+                collection.getItems().stream()
+                        .filter(i -> i.getDeletedAt() == null)
+                        .map(this::toItemResponse)
+                        .toList()
+        );
+    }
+
+    private CollectionItemResponse toItemResponse(CollectionItem item) {
+        return new CollectionItemResponse(
+                item.getId(),
+                item.getName(),
+                item.getCode(),
+                item.getDescription(),
+                item.getCollection().getId(),
+                item.getCollection().getName(),
+                item.getCollection().getOwner().getId(),
+                item.getCollection().getOwner().getName(),
+                item.getCreatedAt(),
+                item.getUpdatedAt()
+        );
+    }
+
+    /**
+     * Monta uma linha do LEFT JOIN cru: collection sempre presente (LEFT),
+     * item nulo quando nao existe (ou soft-deleted).
+     */
+    private CollectionLeftJoinRowResponse toLeftJoinRow(Object[] row) {
+        Collection collection = (Collection) row[0];
+        CollectionItem item = (CollectionItem) row[1];
+
+        CollectionItemResponse itemResponse =
+                (item == null || item.getDeletedAt() != null) ? null : toItemResponse(item);
+
+        return new CollectionLeftJoinRowResponse(toResponse(collection), itemResponse);
     }
 }

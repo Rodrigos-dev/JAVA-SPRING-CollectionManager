@@ -1,20 +1,29 @@
 package com.ars.UserLoginRefreshListTask.modules.user;
 
+import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CollectionResponse;
+import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CollectionWithItemsResponse;
+import com.ars.UserLoginRefreshListTask.modules.collection.entities.Collection;
+import com.ars.UserLoginRefreshListTask.modules.collectionitem.dtos.CollectionItemResponse;
+import com.ars.UserLoginRefreshListTask.modules.collectionitem.entities.CollectionItem;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.CreateUserDto;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.PatchUserDto;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.UpdateUserDto;
+import com.ars.UserLoginRefreshListTask.modules.user.dtos.UserLeftJoinRowResponse;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.UserResponse;
+import com.ars.UserLoginRefreshListTask.modules.user.dtos.UserWithRelationsResponse;
 import com.ars.UserLoginRefreshListTask.modules.user.entities.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Example;
 import org.springframework.data.domain.ExampleMatcher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.persistence.criteria.JoinType;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -96,6 +105,76 @@ public class UserService {
         return toResponse(user);
     }
 
+    // ========== RELACIONAIS (user -> collections -> items) ==========
+
+    public List<UserWithRelationsResponse> getAllWithRelations() {
+        return userRepository.findAllActiveWithRelations().stream()
+                .map(this::toWithRelations)
+                .toList();
+    }
+
+    public UserWithRelationsResponse getByIdWithRelations(Long id) {
+        User user = userRepository.findByIdActiveWithRelations(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Usuario nao encontrado com id: " + id));
+        return toWithRelations(user);
+    }
+
+    public List<UserLeftJoinRowResponse> getAllLeftJoin() {
+        return userRepository.findAllActiveLeftJoinRows().stream()
+                .map(this::toLeftJoinRow)
+                .toList();
+    }
+
+    public List<UserLeftJoinRowResponse> getByIdLeftJoin(Long id) {
+        List<Object[]> rows = userRepository.findActiveLeftJoinRowsById(id);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Usuario nao encontrado com id: " + id);
+        }
+        return rows.stream()
+                .map(this::toLeftJoinRow)
+                .toList();
+    }
+
+    // ========== SPECIFICATIONS (mesmo resultado do with-relations, join programatico) ==========
+
+    public List<UserWithRelationsResponse> getAllWithSpecifications() {
+        return userRepository.findAll(usersWithRelationsSpec()).stream()
+                .map(this::toWithRelations)
+                .toList();
+    }
+
+    public UserWithRelationsResponse getByIdWithSpecifications(Long id) {
+        User user = userRepository.findAll(userByIdWithRelationsSpec(id)).stream()
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Usuario nao encontrado com id: " + id));
+        return toWithRelations(user);
+    }
+
+    /**
+     * Specification "fluente" equivalente ao LEFT JOIN FETCH do JPQL:
+     * root.fetch("collections", LEFT).fetch("items", LEFT) e o join programatico.
+     */
+    private Specification<User> usersWithRelationsSpec() {
+        return (root, query, cb) -> {
+            query.distinct(true);
+            root.fetch("collections", JoinType.LEFT).fetch("items", JoinType.LEFT);
+            return cb.isNull(root.get("deletedAt"));
+        };
+    }
+
+    private Specification<User> userByIdWithRelationsSpec(Long id) {
+        return (root, query, cb) -> {
+            query.distinct(true);
+            root.fetch("collections", JoinType.LEFT).fetch("items", JoinType.LEFT);
+            return cb.and(
+                    cb.equal(root.get("id"), id),
+                    cb.isNull(root.get("deletedAt")));
+        };
+    }
+
     // ========== UPDATE ==========
 
     public UserResponse update(Long id, UpdateUserDto dto) {
@@ -173,6 +252,83 @@ public class UserService {
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );
+    }
+
+    private UserWithRelationsResponse toWithRelations(User user) {
+        return new UserWithRelationsResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getDescription(),
+                user.getCreatedAt(),
+                user.getUpdatedAt(),
+                user.getCollections().stream()
+                        .filter(c -> c.getDeletedAt() == null)
+                        .map(this::toCollectionWithItems)
+                        .toList()
+        );
+    }
+
+    private CollectionWithItemsResponse toCollectionWithItems(Collection collection) {
+        return new CollectionWithItemsResponse(
+                collection.getId(),
+                collection.getName(),
+                collection.getCode(),
+                collection.getDescription(),
+                collection.getOwner().getId(),
+                collection.getOwner().getName(),
+                collection.getCreatedAt(),
+                collection.getUpdatedAt(),
+                collection.getItems().stream()
+                        .filter(i -> i.getDeletedAt() == null)
+                        .map(this::toItemResponse)
+                        .toList()
+        );
+    }
+
+    private CollectionItemResponse toItemResponse(CollectionItem item) {
+        return new CollectionItemResponse(
+                item.getId(),
+                item.getName(),
+                item.getCode(),
+                item.getDescription(),
+                item.getCollection().getId(),
+                item.getCollection().getName(),
+                item.getCollection().getOwner().getId(),
+                item.getCollection().getOwner().getName(),
+                item.getCreatedAt(),
+                item.getUpdatedAt()
+        );
+    }
+
+    private CollectionResponse toCollectionResponse(Collection collection) {
+        return new CollectionResponse(
+                collection.getId(),
+                collection.getName(),
+                collection.getCode(),
+                collection.getDescription(),
+                collection.getOwner().getId(),
+                collection.getOwner().getName(),
+                collection.getCreatedAt(),
+                collection.getUpdatedAt()
+        );
+    }
+
+    /**
+     * Monta uma linha do LEFT JOIN cru: user sempre presente (LEFT),
+     * collection/item nulos quando nao existe (ou soft-deleted).
+     */
+    private UserLeftJoinRowResponse toLeftJoinRow(Object[] row) {
+        User user = (User) row[0];
+        Collection collection = (Collection) row[1];
+        CollectionItem item = (CollectionItem) row[2];
+
+        CollectionResponse collectionResponse =
+                (collection == null || collection.getDeletedAt() != null) ? null : toCollectionResponse(collection);
+        CollectionItemResponse itemResponse =
+                (item == null || item.getDeletedAt() != null) ? null : toItemResponse(item);
+
+        return new UserLeftJoinRowResponse(toResponse(user), collectionResponse, itemResponse);
     }
 
     private User buildProbe(String name, String email) {

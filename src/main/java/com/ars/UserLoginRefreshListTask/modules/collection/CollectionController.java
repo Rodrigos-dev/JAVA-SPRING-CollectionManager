@@ -1,7 +1,9 @@
 package com.ars.UserLoginRefreshListTask.modules.collection;
 
 import com.ars.UserLoginRefreshListTask.core.GlobalExceptionHandler;
+import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CollectionLeftJoinRowResponse;
 import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CollectionResponse;
+import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CollectionWithItemsResponse;
 import com.ars.UserLoginRefreshListTask.modules.collection.dtos.CreateCollectionDto;
 import com.ars.UserLoginRefreshListTask.modules.collection.dtos.PatchCollectionDto;
 import com.ars.UserLoginRefreshListTask.modules.collection.dtos.UpdateCollectionDto;
@@ -41,6 +43,12 @@ import java.util.List;
  * GET    /collections/paged          -> 200 Page (com paginacao)
  * GET    /collections/like           -> 200 List LIKE (sem paginacao)
  * GET    /collections/like/paged     -> 200 Page LIKE (com paginacao)
+ * GET    /collections/with-relations -> 200 List collection -> items (forma aninhada)
+ * GET    /collections/with-relations/{id} -> 200 CollectionWithItemsResponse
+ * GET    /collections/left-join      -> 200 List linhas cruas collection|item (LEFT JOIN)
+ * GET    /collections/left-join/{id} -> 200 List linhas cruas de 1 colecao
+ * GET    /collections/specifications -> 200 List collection -> items (Specification programatica)
+ * GET    /collections/specifications/{id} -> 200 CollectionWithItemsResponse
  * GET    /collections/{id}           -> 200 CollectionResponse
  * PUT    /collections/{id}           -> 200 CollectionResponse (update completo)
  * PATCH  /collections/{id}           -> 200 CollectionResponse (update parcial)
@@ -145,6 +153,84 @@ public class CollectionController {
                 : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return ResponseEntity.ok(collectionService.getAllLikePaged(search, pageable));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar com items (aninhado)", description = "Lista minhas colecoes ativas com itens aninhados (1 query com LEFT JOIN FETCH, tipo relations do TypeORM)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de colecoes com itens"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/with-relations")
+    public ResponseEntity<List<CollectionWithItemsResponse>> getAllWithRelations() {
+        return ResponseEntity.ok(collectionService.getAllWithRelations());
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Buscar com items por id", description = "Retorna 1 colecao minha com itens aninhados", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Colecao com itens"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Colecao nao encontrada ou nao pertence ao usuario autenticado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/with-relations/{id}")
+    public ResponseEntity<CollectionWithItemsResponse> getByIdWithRelations(@PathVariable Long id) {
+        return ResponseEntity.ok(collectionService.getByIdWithRelations(id));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar com LEFT JOIN cru", description = "Uma linha por combinacao collection|item; item nulo quando nao existe (comportamento de JOIN)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Linhas do LEFT JOIN"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/left-join")
+    public ResponseEntity<List<CollectionLeftJoinRowResponse>> getAllLeftJoin() {
+        return ResponseEntity.ok(collectionService.getAllLeftJoin());
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "LEFT JOIN cru por id", description = "Linhas do LEFT JOIN de 1 colecao minha", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Linhas do LEFT JOIN da colecao"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Colecao nao encontrada ou nao pertence ao usuario autenticado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/left-join/{id}")
+    public ResponseEntity<List<CollectionLeftJoinRowResponse>> getByIdLeftJoin(@PathVariable Long id) {
+        return ResponseEntity.ok(collectionService.getByIdLeftJoin(id));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar com Specification", description = "Mesmo resultado do with-relations, montado com Specification + root.fetch programatico (JpaSpecificationExecutor)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de colecoes com itens"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/specifications")
+    public ResponseEntity<List<CollectionWithItemsResponse>> getAllWithSpecifications() {
+        return ResponseEntity.ok(collectionService.getAllWithSpecifications());
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Buscar com Specification por id", description = "Mesmo resultado do with-relations/{id}, montado com Specification programatica", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Colecao com itens"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Colecao nao encontrada ou nao pertence ao usuario autenticado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/specifications/{id}")
+    public ResponseEntity<CollectionWithItemsResponse> getByIdWithSpecifications(@PathVariable Long id) {
+        return ResponseEntity.ok(collectionService.getByIdWithSpecifications(id));
     }
 
     @PreAuthorize("isAuthenticated()")

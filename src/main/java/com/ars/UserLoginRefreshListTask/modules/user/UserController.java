@@ -4,7 +4,9 @@ import com.ars.UserLoginRefreshListTask.core.GlobalExceptionHandler;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.CreateUserDto;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.PatchUserDto;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.UpdateUserDto;
+import com.ars.UserLoginRefreshListTask.modules.user.dtos.UserLeftJoinRowResponse;
 import com.ars.UserLoginRefreshListTask.modules.user.dtos.UserResponse;
+import com.ars.UserLoginRefreshListTask.modules.user.dtos.UserWithRelationsResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -44,6 +46,12 @@ import java.util.List;
  * GET    /users/like/paged         -> 200 Page LIKE (com paginacao)
  * GET    /users/query              -> 200 List query exata (sem paginacao)
  * GET    /users/query/paged        -> 200 Page query exata (com paginacao)
+ * GET    /users/with-relations     -> 200 List user -> collections -> items (forma aninhada)
+ * GET    /users/with-relations/{id}-> 200 UserWithRelationsResponse
+ * GET    /users/left-join          -> 200 List linhas cruas user|collection|item (LEFT JOIN)
+ * GET    /users/left-join/{id}     -> 200 List linhas cruas de 1 usuario
+ * GET    /users/specifications     -> 200 List user -> collections -> items (Specification programatica)
+ * GET    /users/specifications/{id}-> 200 UserWithRelationsResponse
  * GET    /users/{id}               -> 200 UserResponse
  * PUT    /users/{id}               -> 200 UserResponse (update completo)
  * PATCH  /users/{id}               -> 200 UserResponse (update parcial)
@@ -180,6 +188,84 @@ public class UserController {
                 : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return ResponseEntity.ok(userService.getAllQueryPaged(name, email, pageable));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar com relations (aninhado)", description = "Lista todos os usuarios ativos com colecoes e itens aninhados (1 query com LEFT JOIN FETCH, tipo relations do TypeORM)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de usuarios com relations"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/with-relations")
+    public ResponseEntity<List<UserWithRelationsResponse>> getAllWithRelations() {
+        return ResponseEntity.ok(userService.getAllWithRelations());
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Buscar com relations por id", description = "Retorna 1 usuario com colecoes e itens aninhados", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuario com relations"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Usuario nao encontrado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/with-relations/{id}")
+    public ResponseEntity<UserWithRelationsResponse> getByIdWithRelations(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getByIdWithRelations(id));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar com LEFT JOIN cru", description = "Uma linha por combinacao user|collection|item; collection/item nulos quando nao existe (comportamento de JOIN)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Linhas do LEFT JOIN"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/left-join")
+    public ResponseEntity<List<UserLeftJoinRowResponse>> getAllLeftJoin() {
+        return ResponseEntity.ok(userService.getAllLeftJoin());
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "LEFT JOIN cru por id", description = "Linhas do LEFT JOIN de 1 usuario", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Linhas do LEFT JOIN do usuario"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Usuario nao encontrado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/left-join/{id}")
+    public ResponseEntity<List<UserLeftJoinRowResponse>> getByIdLeftJoin(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getByIdLeftJoin(id));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar com Specification", description = "Mesmo resultado do with-relations, montado com Specification + root.fetch programatico (JpaSpecificationExecutor)", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de usuarios com relations"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/specifications")
+    public ResponseEntity<List<UserWithRelationsResponse>> getAllWithSpecifications() {
+        return ResponseEntity.ok(userService.getAllWithSpecifications());
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Buscar com Specification por id", description = "Mesmo resultado do with-relations/{id}, montado com Specification programatica", security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuario com relations"),
+            @ApiResponse(responseCode = "403", description = "Sem token, token invalido ou acesso negado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class))),
+            @ApiResponse(responseCode = "404", description = "Usuario nao encontrado",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorBody.class)))
+    })
+    @GetMapping("/specifications/{id}")
+    public ResponseEntity<UserWithRelationsResponse> getByIdWithSpecifications(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getByIdWithSpecifications(id));
     }
 
     @PreAuthorize("isAuthenticated()")

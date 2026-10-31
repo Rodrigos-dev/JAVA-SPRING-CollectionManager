@@ -46,7 +46,7 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 │   │   ├── dtos/             CreateUserDto, UpdateUserDto, PatchUserDto, UserResponse
 │   │   ├── interfaces/       (futuro)
 │   │   ├── enums/            UserRoleEnum
-│   │   ├── UserController.java   CRUD /users (10 rotas)
+│   │   ├── UserController.java   CRUD /users (14 rotas)
 │   │   ├── UserService.java      CRUD + BCrypt + soft delete + 409
 │   │   └── UserRepository.java   extends JpaRepository
 │   ├── collection/          # coleções do usuário (IMPLEMENTADO)
@@ -54,7 +54,7 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 │   │   ├── dtos/             CreateCollectionDto, UpdateCollectionDto, PatchCollectionDto, CollectionResponse
 │   │   ├── interfaces/       (futuro)
 │   │   ├── enums/            (futuro)
-│   │   ├── CollectionController.java   CRUD /collections (9 rotas)
+│   │       ├── CollectionController.java   CRUD /collections (13 rotas)
 │   │   ├── CollectionService.java      CRUD + owner do JWT + soft delete + 409
 │   │   └── CollectionRepository.java   extends JpaRepository (scoped por owner)
 │   └── collectionitem/       # itens das coleções (IMPLEMENTADO)
@@ -103,12 +103,26 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 - Email duplicado → `409 {error}`
 - Senha **nunca** retorna na resposta
 
-### Endpoints (31 operações)
+### Endpoints (43 operações)
 
 - **Auth (público):** `POST /auth/login`, `POST /auth/refresh`
 - **Users:** `POST /users` (público) · `GET /users`, `GET /users/paged`, `GET /users/like`, `GET /users/like/paged`, `GET /users/query`, `GET /users/query/paged`, `GET /users/{id}`, `PUT /users/{id}`, `PATCH /users/{id}`, `DELETE /users/{id}` (todos com `Authorization: Bearer <accessToken>`)
+- **Users relacionais (todos com token):** `GET /users/with-relations`, `GET /users/with-relations/{id}` (aninhado via `LEFT JOIN FETCH`) · `GET /users/left-join`, `GET /users/left-join/{id}` (linhas cruas `user|collection|item`) · `GET /users/specifications`, `GET /users/specifications/{id}` (mesmo shape da forma aninhada, via `Specification` + `root.fetch` programático)
 - **Collections (todos com token):** `POST /collections`, `GET /collections`, `GET /collections/paged`, `GET /collections/like`, `GET /collections/like/paged`, `GET /collections/{id}`, `PUT /collections/{id}`, `PATCH /collections/{id}`, `DELETE /collections/{id}`
+- **Collections relacionais (todos com token):** `GET /collections/with-relations`, `GET /collections/with-relations/{id}` · `GET /collections/left-join`, `GET /collections/left-join/{id}` · `GET /collections/specifications`, `GET /collections/specifications/{id}`
 - **Collection Items (todos com token):** `POST /collection-items`, `GET /collection-items` (`?collectionId=` opcional), `GET /collection-items/paged`, `GET /collection-items/like`, `GET /collection-items/like/paged`, `GET /collection-items/{id}`, `PUT /collection-items/{id}`, `PATCH /collection-items/{id}`, `DELETE /collection-items/{id}`
+
+### Relacional — 3 formas de trazer relations
+
+| Forma | Como funciona | Retorna |
+|-------|---------------|---------|
+| `with-relations` | JPQL `LEFT JOIN FETCH` (1 query, sem N+1) | aninhado: user → collections[] → items[] |
+| `left-join` | JPQL `SELECT u, c, i ... LEFT JOIN` multi-coluna | linhas cruas: 1 linha por combinação, null quando não existe, user repete |
+| `specifications` | `JpaSpecificationExecutor` + `root.fetch("collections", LEFT).fetch("items", LEFT)` | mesmo shape do `with-relations` (join programático, sem depender de string JPQL) |
+
+- Formas A e C filtram filhos soft-deleted no mapeamento (item/collection excluído vira `null`, o user não some)
+- Users relacionais não têm escopo (mesmo comportamento do `GET /users`); Collections relacionais são do dono do token
+- Sem paginação nessas rotas (join fetch + Page quebra a paginação)
 
 ## Swagger / Documentação (springdoc 3.1.1)
 
