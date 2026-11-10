@@ -33,10 +33,10 @@ Backend **Spring Boot** de autenticação (login + refresh token) e tarefas (lis
 
 ## Estrutura do Projeto
 
-Package raiz: `com.ars.UserLoginRefreshListTask` (mantido — padrão existente)
+Package raiz: `com.ars.collectionmanager` (renomeado em 2026-11-09)
 
 ```
-src/main/java/com/ars/UserLoginRefreshListTask/
+src/main/java/com/ars/collectionmanager/
 ├── core/                  # config, errors, logging, observability (futuro)
 ├── infrastructure/        # database, cache, http (futuro)
 ├── shared/                # types, utils, primitives, contracts (futuro)
@@ -63,7 +63,7 @@ src/main/java/com/ars/UserLoginRefreshListTask/
 │       ├── CollectionItemController.java   CRUD /collection-items (9 rotas)
 │       ├── CollectionItemService.java      CRUD + dono herdado da collection + soft delete + 409
 │       └── CollectionItemRepository.java   extends JpaRepository (scoped por owner da collection)
-└── UserLoginRefreshListTaskApplication.java   # entry point
+└── CollectionManagerApplication.java   # entry point
 ```
 
 `src/test/java/...` espelha a estrutura main.
@@ -168,4 +168,4 @@ mysql -u root -p -e "CREATE DATABASE user_login_refresh_list_task;"
 - [x] Swagger UI + documentação dos endpoints (2026-10-21)
 - [x] Módulo `collection` (tabela `collections`, user 1 → N) — 2026-10-24
 - [ ] Módulo `task` em `modules/task`
-- [ ] Naming do package raiz: `UserLoginRefreshListTask` tem maiúsculas (viola lowercase) — manter ou renomear
+- [x] Naming do package raiz: renomeado para `com.ars.collectionmanager` (2026-11-09)

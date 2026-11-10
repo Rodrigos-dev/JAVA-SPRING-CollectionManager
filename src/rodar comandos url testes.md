@@ -24,8 +24,8 @@ rodar projeto - ir no debugger e dar play
 
 - abre em http://localhost:8080 - swagger em http://localhost:8080/swagger-ui.html
 - parar: Ctrl+C no terminal
-- VS Code: F5 (config em `.vscode/launch.json`, mainClass `com.ars.collectionmanager.UserLoginRefreshListTaskApplication`)
-- IntelliJ: play/debugger na classe `UserLoginRefreshListTaskApplication`
+- VS Code: F5 (config em `.vscode/launch.json`, mainClass `com.ars.collectionmanager.CollectionManagerApplication`)
+- IntelliJ: play/debugger na classe `CollectionManagerApplication`
 
 # Testes
 
@@ -35,7 +35,7 @@ geral (suíte inteira):
 .\mvnw.cmd test
 ```
 
-* o teste de contexto (`UserLoginRefreshListTaskApplicationTests`) sobe o Spring completo -> precisa MySQL rodando
+* o teste de contexto (`CollectionManagerApplicationTests`) sobe o Spring completo -> precisa MySQL rodando
 
 arquivo só:
 

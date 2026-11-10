@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @OpenAPIDefinition(
         info = @Info(
-                title = "UserLoginRefreshListTask API",
+                title = "Collection Manager API",
                 version = "0.0.1",
                 description = """
                         API de usuarios com autenticacao JWT (access + refresh token).
