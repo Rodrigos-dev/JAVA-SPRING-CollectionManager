@@ -22,6 +22,7 @@ O usuário se autentica, cria suas coleções e adiciona itens a cada coleção.
 - [Testes](#testes)
 - [Documentação Swagger](#documentação-swagger)
 - [Comandos Rápidos](#comandos-rápidos)
+- [Capturas de Tela](#capturas-de-tela)
 - [Roadmap](#roadmap)
 
 ## Stack
@@ -294,6 +295,24 @@ Use o botão **Authorize** no Swagger para colar o `accessToken` e testar rotas 
   }
 }
 ```
+
+## Capturas de Tela
+
+### Código
+
+![Código 1 — estrutura](docs/images/codigo-1.png)
+
+![Código 2 — estrutura](docs/images/codigo-2.png)
+
+### Swagger rodando
+
+![Swagger rodando 1](docs/images/swagger-rodando-1.png)
+
+![Swagger rodando 2](docs/images/swagger-rodando-2.png)
+
+![Swagger rodando 3](docs/images/swagger-rodando-3.png)
+
+![Swagger rodando 4](docs/images/swagger-rodando-4.png)
 
 ## Roadmap
 
